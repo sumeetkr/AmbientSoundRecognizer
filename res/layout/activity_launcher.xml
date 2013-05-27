@@ -1,0 +1,51 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="74dp"
+        android:layout_weight="0.03"
+        android:orientation="horizontal" >
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enabled" />
+
+        <CheckBox
+            android:id="@+id/enabledCheckbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <EditText
+            android:id="@+id/txtInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="192dp"
+            android:ems="10"
+            android:inputType="textMultiLine" >
+
+            <requestFocus />
+        </EditText>
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/archiveButton"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Save Data to SD Card" />
+
+    <TextView
+        android:id="@+id/dataCountText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="None" />
+
+    <Button
+        android:id="@+id/scanNowButton"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:text="Scan Now" />
+
+</LinearLayout>
