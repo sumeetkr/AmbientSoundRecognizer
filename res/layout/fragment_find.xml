@@ -14,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="30dp"
+        android:layout_marginTop="10dp"
         android:orientation="vertical"
         android:padding="2dp">
     </LinearLayout>
@@ -43,14 +43,5 @@
             android:layout_height="wrap_content">
     	</ListView>
     </LinearLayout>
-
-    <Button
-        android:id="@+id/button_edit"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBottom="@+id/listener_view"
-        android:layout_alignRight="@+id/matches_view"
-        android:onClick="onClickEditBtn"
-        android:text="@string/label" />
     
 </RelativeLayout>
