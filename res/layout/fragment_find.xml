@@ -31,10 +31,10 @@
 
         <TextView
             android:id="@+id/textView1"
-            android:layout_width="94dp"
+            android:layout_width="187dp"
             android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:text="Matches"
+            android:gravity="left"
+            android:text="@string/matching_sounds"
             android:textAppearance="?android:attr/textAppearanceMedium" />
         
         <ListView

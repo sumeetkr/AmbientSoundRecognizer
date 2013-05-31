@@ -1,6 +1,7 @@
 package in.sumeetkumar.asr.util;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.PriorityQueue;
 
@@ -47,7 +48,9 @@ public class FeaturesMatchFinderTask  {
 		List<Feature> features = params[0];
 		if (features.size() <1 || feature == null) return null;
 		
-		double [] command = feature.getMfccs();
+		HashMap<String,Double> map = new HashMap<String, Double>();
+		
+		double [] mfcc = feature.getMfccs();
 		
 		for (Feature ft : features) {
 			
@@ -55,17 +58,36 @@ public class FeaturesMatchFinderTask  {
 			double mse = 0;
 			 
 			for( int i = 0 ; i < spectrum.length ; i++ ) {
-			     mse += Math.pow( (spectrum[i] - command[i]), 2);
+			     mse += Math.pow( (spectrum[i] - mfcc[i]), 2);
 			}
 			mse /= spectrum.length;
 			
-//		matchQueue.add(	new Match(ft.getName(),0, Math.abs(ft.getL1Norm() - feature.getL1Norm())));
-			matchQueue.add(	new Match(ft.getName(),0, mse));
+			if(map.containsKey(ft.getName())) {
+				double closestVal = map.get(ft.getName()) < mse ? map.get(ft.getName()): mse;
+				map.put(ft.getName(), closestVal);
+			}
+			else
+			{
+				map.put(ft.getName(), mse);
+			}
+			
+
+			//matchQueue.add(	new Match(ft.getName(),0, Math.abs(ft.getL1Norm() - feature.getL1Norm())));
 		}
 		
-		for (int i = 0; i < matches.length; i++) {
+		
+		double total = 0;
+		for (String key : map.keySet()) {
+			total +=  map.get(key);
+		}
+		for (String key : map.keySet()) {
+			matchQueue.add(	new Match(key, (map.get(key)*100)/total , map.get(key)));
+		}
+		
+		int size = matchQueue.size();
+		for (int i = 0; i < size && i < matches.length; i++) {
 			Match match = matchQueue.poll();
-			matches[i] = match.getName() + " : value = " + match.getMatchValue();
+			matches[i] = match.getName() + " : value = " + String.format("%.2f", 100 - (match.getPercentage()))+ "%";
 		}
 
 		adapter.notifyDataSetChanged();

@@ -30,5 +30,6 @@
     <string name="find">Find</string>
     <string name="discover">Discover</string>
     <string name="search">Search</string>
+    <string name="matching_sounds">Matching Sounds</string>
 
 </resources>

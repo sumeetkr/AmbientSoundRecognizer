@@ -86,7 +86,7 @@ public class FindFragment extends Fragment {
 					"Pipeline is not enabled.", Toast.LENGTH_SHORT).show();
 		}
 
-		updateUI(" started listening");
+		//updateUI(" started listening");
 	}
 
 	private void updateUI(final String message) {
@@ -105,7 +105,7 @@ public class FindFragment extends Fragment {
 
 	private void stopListening() {
 		funfManagerConn.unregisterListener(listener);
-		updateUI(" stopped listening");
+		//updateUI(" stopped listening");
 	}
 
 	private void writeDataToFile() {
@@ -177,7 +177,7 @@ public class FindFragment extends Fragment {
 		matches = new String[5];
 
 		for (int i = 0; i < matches.length; i++) {
-			matches[i] = "Sound " + i;
+			matches[i] = "";
 		}
 
 		arrayAdapter = new ArrayAdapter<String>(this.getActivity(),
