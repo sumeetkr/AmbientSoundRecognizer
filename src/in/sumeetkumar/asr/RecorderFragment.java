@@ -1,19 +1,22 @@
 package in.sumeetkumar.asr;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 
-import com.google.gson.JsonElement;
+import javax.security.auth.PrivateCredentialPermission;
 
-import edu.mit.media.funf.FunfManager;
-import edu.mit.media.funf.json.IJsonObject;
-import edu.mit.media.funf.probe.Probe.DataListener;
-import edu.mit.media.funf.util.LogUtil;
+import com.google.gson.JsonElement;
 import in.sumeetkumar.asr.FindFragment.ListenButton;
+import in.sumeetkumar.asr.data.AudioData;
+import in.sumeetkumar.asr.data.Feature;
+import in.sumeetkumar.asr.data.KeyValuePair;
+import in.sumeetkumar.asr.util.ASRFileWriter;
+import in.sumeetkumar.asr.util.AudioFeaturesExtractor;
+import in.sumeetkumar.asr.util.AudioProcessor;
 import in.sumeetkumar.asr.util.DatabaseHandler;
-import in.sumeetkumar.asr.util.Feature;
 import in.sumeetkumar.asr.util.FeaturesMatchFinderTask;
-import in.sumeetkumar.asr.util.MicConnection;
 import in.sumeetkumar.asr.util.UserInputManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,16 +49,17 @@ public class RecorderFragment extends Fragment {
 	private String[] matches;
 	private ArrayAdapter<String> arrayAdapter;
 	private Handler handler;
-	private DataListener listener;
-	private LinkedList<IJsonObject> dataLog;
 	private int dataCount;
-	private MicConnection funfManagerConn;
 	private String labelString;
+	private Boolean isListening;
+	private AudioProcessor audioProcessor;
+	private AudioFeaturesExtractor featuresExtractor;
+	LinkedList<Feature> audioFeatures;
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,
 			Bundle savedInstanceState) {
-		View rootView = inflater.inflate(R.layout.activity_recorder, container,
+		View rootView = inflater.inflate(R.layout.fragment_recorder, container,
 				false);
 
 		recordButton = new RecordButton(this.getActivity());
@@ -78,10 +82,6 @@ public class RecorderFragment extends Fragment {
 		featuresListView.setAdapter(arrayAdapter);
 
 		initializeDependencies();
-		
-		this.getActivity().bindService(
-				new Intent(this.getActivity(), FunfManager.class),
-				funfManagerConn, this.getActivity().BIND_AUTO_CREATE);
 
 		return rootView;
 	}
@@ -96,21 +96,50 @@ public class RecorderFragment extends Fragment {
 	}
 
 	private void startRecording() {
-		dataLog = new LinkedList<IJsonObject>();
-		dataCount = 0;
 
-		if (funfManagerConn.isEnabled()) {
-			// Manually register the pipeline
-			funfManagerConn.registerListener(listener);
-		} else {
-			Toast.makeText(this.getActivity().getBaseContext(),
-					"Pipeline is not enabled.", Toast.LENGTH_SHORT).show();
-		}
+		dataCount = 0;
+		isListening = true;
+
+		audioProcessor = new AudioProcessor() {
+			@Override
+			protected void dataArrival(long timestamp, short[] data,
+					int length, int frameLength) {
+				super.dataArrival(timestamp, data, length, frameLength);
+
+				if(isListening){
+					AudioData audioData = new AudioData(timestamp, data);
+					final Feature feature = featuresExtractor.extractFeatures(audioData);
+					audioFeatures.add(feature);
+					
+					handler.post(new Runnable() {
+					@Override
+					public void run() {
+						matches[0] = "l1Norm "
+								+ feature.getL1Norm();
+						matches[1] = "l2Norm "
+								+ feature.getL2Norm();
+						matches[2] = "linfNorm "
+								+ feature.getLinfNorm();
+						matches[3] = "mfccs "
+								+ feature.getMfccsAsString();
+						matches[4] = "diffSecs "
+								+ feature.getDiffSecs();
+
+						arrayAdapter.notifyDataSetChanged();
+					}
+				});	
+				}
+			}
+
+		};
+
+		audioProcessor.startRecord();
+		
 	}
 
 	private void stopRecording() {
-
-		funfManagerConn.unregisterListener(listener);
+		isListening = false;
+		audioProcessor.stopRecord();
 
 		UserInputManager uim = new UserInputManager();
 		Callback callback = new Callback() {
@@ -120,6 +149,7 @@ public class RecorderFragment extends Fragment {
 			}
 		};
 		uim.getLabel(getActivity(), "Label the sound", callback);
+		
 	}
 	
 	private void applyLabel(String value) {
@@ -128,19 +158,22 @@ public class RecorderFragment extends Fragment {
 		// TODO - need to move it as event handler
 		if (labelString != "") {
 			// writeDataToFile();
+			dumpAudioData( audioProcessor.getSamples(), labelString);
 			writeDataToDatabase(labelString);
 		}
 		labelString = "";
+		
+		//need to move to better place
+		audioProcessor.clearSamples();
 	}
 	
 	private void writeDataToDatabase(String name) {
 		DatabaseHandler db = new DatabaseHandler(this.getActivity());
-
-		Iterator<IJsonObject> itr = dataLog.iterator();
+		
+		Iterator<Feature> itr = audioFeatures.iterator();
 		while (itr.hasNext()) {
-			IJsonObject jsonObject = itr.next();
-
-			Feature feature = new Feature(jsonObject, name);
+			Feature feature = itr.next();
+			feature.setName(name);
 			db.addFeature(feature);
 		}
 
@@ -153,52 +186,30 @@ public class RecorderFragment extends Fragment {
 
 		db.close();
 
-		dataLog = new LinkedList<IJsonObject>();
+		audioFeatures = new LinkedList<Feature>();
 		dataCount = 0;
 	}
 
+	private void dumpAudioData(ArrayList<KeyValuePair<Long, short[]>> samples, String label) {
+
+		ASRFileWriter fileWriter = new ASRFileWriter(label);
+
+		for (KeyValuePair<Long, short[]> sample : samples) {
+			String sampleString = Arrays.toString(sample.getValue());
+			int length = sampleString.length();
+			fileWriter.appendText(sample.getKey() + ","
+					+ sampleString.substring(1, length - 1));
+		}
+
+		fileWriter.close();
+	}
+	
 	private void initializeDependencies() {
-		funfManagerConn = new MicConnection();
-		labelString = "";
 		
-		dataCount = 0;
-		dataLog = new LinkedList<IJsonObject>();
+		audioProcessor = new AudioProcessor();
+		audioFeatures = new LinkedList<Feature>();
 		handler = new Handler();
-		listener = new DataListener() {
-			@Override
-			public void onDataReceived(IJsonObject probeConfig, IJsonObject data) {
-				final IJsonObject dataCopy = data;
-				dataCount += 1;
-				dataLog.add(dataCopy);
-				Log.d(LogUtil.TAG, "RunningApplications: " + dataCopy);
-				
-				handler.post(new Runnable() {
-					@Override
-					public void run() {
-						matches[0] = "l1Norm "
-								+ dataCopy.get("l1Norm").toString();
-						matches[1] = "l2Norm "
-								+ dataCopy.get("l2Norm").toString();
-						matches[2] = "linfNorm "
-								+ dataCopy.get("linfNorm").toString();
-						matches[3] = "mfccs "
-								+ dataCopy.get("mfccs").toString();
-						matches[4] = "diffSecs "
-								+ dataCopy.get("diffSecs").toString();
-
-						arrayAdapter.notifyDataSetChanged();
-					}
-				});
-
-			}
-
-			@Override
-			public void onDataCompleted(IJsonObject probeConfig,
-					JsonElement checkpoint) {
-				// TODO Auto-generated method stub
-
-			}
-		};
+		featuresExtractor = new AudioFeaturesExtractor();
 	}
 
 	class RecordButton extends Button {

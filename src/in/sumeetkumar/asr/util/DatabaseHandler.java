@@ -1,9 +1,9 @@
 package in.sumeetkumar.asr.util;
 
+import in.sumeetkumar.asr.data.Feature;
+
 import java.util.ArrayList;
 import java.util.List;
-
-import edu.mit.media.funf.util.LogUtil;
  
 import android.content.ContentValues;
 import android.content.Context;

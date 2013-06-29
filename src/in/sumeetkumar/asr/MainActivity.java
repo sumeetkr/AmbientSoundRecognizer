@@ -9,17 +9,8 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v4.app.ListFragment;
-import android.support.v4.app.NavUtils;
 import android.support.v4.view.ViewPager;
-import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
-import android.widget.TextView;
 
 public class MainActivity extends FragmentActivity implements
 		ActionBar.TabListener {
@@ -131,13 +122,13 @@ public class MainActivity extends FragmentActivity implements
 				case 0:
 					fragment = new FindFragment();
 					break;
-				case 1:
+				default:
 					fragment = new RecorderFragment();
 					break;
 	
-				default:
-					fragment = new PlayFragment();
-					break;
+//				default:
+//					fragment = new PlayFragment();
+//					break;
 			}
 			
 			Bundle args = new Bundle();
@@ -149,7 +140,7 @@ public class MainActivity extends FragmentActivity implements
 		@Override
 		public int getCount() {
 			// Show 3 total pages.
-			return 3;
+			return 2;
 		}
 
 		@Override
@@ -160,8 +151,8 @@ public class MainActivity extends FragmentActivity implements
 				return getString(R.string.search).toUpperCase(l);
 			case 1:
 				return getString(R.string.record).toUpperCase(l);
-			case 2:
-				return getString(R.string.play).toUpperCase(l);
+//			case 2:
+//				return getString(R.string.play).toUpperCase(l);
 			}
 			return null;
 		}

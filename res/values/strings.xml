@@ -31,5 +31,6 @@
     <string name="discover">Discover</string>
     <string name="search">Search</string>
     <string name="matching_sounds">Matching Sounds</string>
+    <string name="title_activity_play">Play</string>
 
 </resources>

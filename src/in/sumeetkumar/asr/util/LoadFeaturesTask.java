@@ -1,8 +1,8 @@
 package in.sumeetkumar.asr.util;
 
-import java.util.List;
+import in.sumeetkumar.asr.data.Feature;
 
-import edu.mit.media.funf.util.LogUtil;
+import java.util.List;
 
 import android.content.Context;
 import android.os.AsyncTask;

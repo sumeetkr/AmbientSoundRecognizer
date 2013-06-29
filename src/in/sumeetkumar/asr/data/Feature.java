@@ -1,6 +1,6 @@
-package in.sumeetkumar.asr.util;
+package in.sumeetkumar.asr.data;
 
-import edu.mit.media.funf.json.IJsonObject;
+import java.util.Arrays;
 
 public class Feature {
 	//private variables
@@ -30,6 +30,16 @@ public class Feature {
 		// TODO Auto-generated constructor stub
 		mfccs = new double[12];
 		psdAcrossFrequencyBands = new double[4];
+	}
+	
+	public Feature(AudioData data){
+//		setL1Norm(data.getL1_NORM());
+//		setL2Norm(data.getL2_NORM());
+//		setLinfNorm(data.getLinf_NORM());
+		setTimestamp(data.getTime());
+		setDiffSecs(data.getTime());
+//		setPsdAcrossFrequencyBands(data.getPsdAcrossFrequencyBands());
+//		setMfccs(data.getFeatureCepstrum());
 	}
 
 	public Feature(IJsonObject json) {
@@ -135,6 +145,9 @@ public class Feature {
 	}
 
     public String getMfccsAsString() {
+    	if(mfccsAsString==null){
+    		mfccsAsString = Arrays.toString(mfccs);
+    	}
 		return mfccsAsString;
 	}
 

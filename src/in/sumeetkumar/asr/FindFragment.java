@@ -1,13 +1,12 @@
 package in.sumeetkumar.asr;
 
-import in.sumeetkumar.asr.util.DatabaseHandler;
-import in.sumeetkumar.asr.util.Feature;
-import in.sumeetkumar.asr.util.FeaturesMatchFinderTask;
-import in.sumeetkumar.asr.util.LoadFeaturesTask;
-import in.sumeetkumar.asr.util.MicConnection;
-import in.sumeetkumar.asr.util.SDCardWriter;
-import in.sumeetkumar.asr.util.UserInputManager;
+import in.sumeetkumar.asr.data.AudioData;
+import in.sumeetkumar.asr.data.Feature;
+import in.sumeetkumar.asr.util.*;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -15,18 +14,14 @@ import java.util.List;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
-import edu.mit.media.funf.FunfManager;
-import edu.mit.media.funf.json.IJsonObject;
-import edu.mit.media.funf.pipeline.BasicPipeline;
-import edu.mit.media.funf.probe.Probe.DataListener;
-import edu.mit.media.funf.probe.builtin.AudioFeaturesProbe;
-import edu.mit.media.funf.util.LogUtil;
+import in.sumeetkumar.asr.data.*;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Handler.Callback;
 import android.os.IBinder;
 import android.os.Message;
+import android.R.bool;
+import android.R.integer;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ComponentName;
@@ -59,10 +54,13 @@ public class FindFragment extends Fragment {
 	private ListenButton listenButton;
 	private List<Feature> existingFeaturesInDatabase;
 	private Handler handler;
-	private DataListener listener;
-	private LinkedList<IJsonObject> dataLog;
 	private int dataCount;
-	private MicConnection funfManagerConn;
+	private AudioProcessor audioProcessor;
+	private AudioFeaturesExtractor featuresExtractor;
+	private ASRFileWriter fileWriter;
+	private Boolean isListening;
+
+	// private MicConnection funfManagerConn;
 
 	private void onListen(boolean start) {
 		if (start) {
@@ -73,30 +71,44 @@ public class FindFragment extends Fragment {
 	}
 
 	private void startListening() {
-		dataLog = new LinkedList<IJsonObject>();
 		dataCount = 0;
+		isListening = true;
 
 		getFeaturesFromDatabase();
+		audioProcessor = new AudioProcessor() {
+			int i = 0;
 
-		if (funfManagerConn.isEnabled()) {
-			// Manually register the pipeline
-			funfManagerConn.registerListener(listener);
-		} else {
-			Toast.makeText(this.getActivity().getBaseContext(),
-					"Pipeline is not enabled.", Toast.LENGTH_SHORT).show();
-		}
+			@Override
+			protected void dataArrival(long timestamp, short[] data,
+					int length, int frameLength) {
+				super.dataArrival(timestamp, data, length, frameLength);
 
-		//updateUI(" started listening");
+				if (i % 5 == 0 && isListening) {// skip 5 frames
+					AudioData audioData = new AudioData(timestamp, data);
+					matchFeatures(featuresExtractor.extractFeatures(audioData));
+					updateUI("");
+				}
+
+				if (i == 100) {
+					i = 0;
+				}
+				i++;
+
+			}
+
+			protected void onRecordEnded() {
+				//dumpAudioData(this);
+				this.clearSamples();
+			}
+		};
+
+		audioProcessor.startRecord();
 	}
 
 	private void updateUI(final String message) {
 		this.getActivity().runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
-				for (int i = 0; i < matches.length; i++) {
-					matches[i] = "Updated Sound " + i + message;
-				}
-
 				arrayAdapter.notifyDataSetChanged();
 			}
 
@@ -104,21 +116,8 @@ public class FindFragment extends Fragment {
 	}
 
 	private void stopListening() {
-		funfManagerConn.unregisterListener(listener);
-		//updateUI(" stopped listening");
-	}
-
-	private void writeDataToFile() {
-		StringBuilder stringBuilder = new StringBuilder();
-		Iterator<IJsonObject> itr = dataLog.iterator();
-		while (itr.hasNext()) {
-			IJsonObject jsonObject = itr.next();
-			stringBuilder.append(jsonObject.toString());
-			stringBuilder.append('\n');
-		}
-		SDCardWriter.generateNoteOnSD(SDCardWriter.FILE_NAME,
-				stringBuilder.toString());
-
+		isListening = false;
+		audioProcessor.stopRecord();
 	}
 
 	class ListenButton extends Button {
@@ -145,7 +144,7 @@ public class FindFragment extends Fragment {
 					(int) (drawable.getIntrinsicHeight() * 2));
 			setCompoundDrawables(null, drawable, null, null);
 
-			setText("Connecting Mic");
+			setText("Start");
 			setOnClickListener(clicker);
 		}
 	}
@@ -159,10 +158,6 @@ public class FindFragment extends Fragment {
 
 		initializeDependencies();
 
-		this.getActivity().bindService(
-				new Intent(this.getActivity(), FunfManager.class),
-				funfManagerConn, this.getActivity().BIND_AUTO_CREATE);
-
 		listenButton = new ListenButton(this.getActivity());
 
 		ViewGroup ll = (ViewGroup) rootView.findViewById(R.id.listener_view);
@@ -170,7 +165,6 @@ public class FindFragment extends Fragment {
 				LayoutParams.WRAP_CONTENT);
 		ll.addView(listenButton, lp);
 
-		getFeaturesFromDatabase();
 
 		matchesListView = (ListView) rootView
 				.findViewById(R.id.list_suggestions);
@@ -184,6 +178,7 @@ public class FindFragment extends Fragment {
 				android.R.layout.simple_list_item_1, matches);
 		matchesListView.setAdapter(arrayAdapter);
 
+		getFeaturesFromDatabase();
 		return rootView;
 	}
 
@@ -213,40 +208,9 @@ public class FindFragment extends Fragment {
 	}
 
 	private void initializeDependencies() {
-
-		funfManagerConn = new MicConnection();
-		
 		dataCount = 0;
-		dataLog = new LinkedList<IJsonObject>();
+		featuresExtractor = new AudioFeaturesExtractor();
 		handler = new Handler();
-		listener = new DataListener() {
-			@Override
-			public void onDataReceived(IJsonObject probeConfig, IJsonObject data) {
-				final IJsonObject dataCopy = data;
-				dataCount += 1;
-				dataLog.add(dataCopy);
-				Log.d(LogUtil.TAG, "RunningApplications: " + dataCopy);
-
-				// new FeaturesMatchFinderTask(matches, arrayAdapter, new
-				// Feature(dataCopy) ).execute(existingFeaturesInDatabase);
-				handler.post(new Runnable() {
-					@Override
-					public void run() {
-						FeaturesMatchFinderTask task = new FeaturesMatchFinderTask(
-								matches, arrayAdapter, new Feature(dataCopy));
-						task.doInBackground(existingFeaturesInDatabase);
-					}
-				});
-
-			}
-
-			@Override
-			public void onDataCompleted(IJsonObject probeConfig,
-					JsonElement checkpoint) {
-				// TODO Auto-generated method stub
-
-			}
-		};
 	}
 
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -255,13 +219,48 @@ public class FindFragment extends Fragment {
 		return true;
 	}
 
-	// @Override
-	// public void onStop() {
-	//
-	// //throwing exception
-	// // if (funfManager != null) {
-	// // funfManager.disablePipeline(PIPELINE_NAME);
-	// // }
-	//
-	// }
+	private void dumpAudioData(AudioProcessor processor) {
+		ArrayList<KeyValuePair<Long, short[]>> samples = audioProcessor
+				.getSamples();
+
+		fileWriter = new ASRFileWriter("AudioData");
+
+		for (KeyValuePair<Long, short[]> sample : samples) {
+			String sampleString = Arrays.toString(sample.getValue());
+			int length = sampleString.length();
+			fileWriter.appendText(sample.getKey() + ","
+					+ sampleString.substring(1, length - 1));
+		}
+
+		fileWriter.close();
+	}
+
+	private void matchFeatures(Feature features) {
+		final Feature featureCopy = features;
+		// dataCount += 1;
+		// dataLog.add(dataCopy);
+		// Log.d(LogUtil.TAG, "RunningApplications: " + dataCopy);
+
+		// new FeaturesMatchFinderTask(matches, arrayAdapter, new
+		// Feature(dataCopy) ).execute(existingFeaturesInDatabase);
+		handler.post(new Runnable() {
+			@Override
+			public void run() {
+				FeaturesMatchFinderTask task = new FeaturesMatchFinderTask(
+						matches, arrayAdapter, featureCopy);
+				task.doInBackground(existingFeaturesInDatabase);
+			}
+		});
+	}
+
+	@Override
+	public void onStop() {
+
+		if (audioProcessor.isAlive()) {
+			audioProcessor.stopRecord();
+		}
+		audioProcessor = null;
+
+		super.onStop();
+	}
 }
