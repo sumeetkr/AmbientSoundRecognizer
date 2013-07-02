@@ -69,14 +69,14 @@ public class AudioProcessor extends AudioRecorder {
 	
 	protected void dataArrival(long timestamp, short[] data, int length, int frameLength){
 		
-		if(this.frameIndex % this.pickedSampleIndex == 1){
-			
+//		if(this.frameIndex % this.pickedSampleIndex == 1){
+//			
 			synchronized(samples){
 				samples.add(new KeyValuePair<Long, short[]>(Long.valueOf(timestamp), data));
 			}
 			//Log.i("Frame", "Frame added");
 			
-		}
+//		}
 		
 		frameIndex++;
 		if(frameIndex == Integer.MAX_VALUE - 1)

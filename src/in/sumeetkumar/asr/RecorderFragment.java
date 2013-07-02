@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Handler.Callback;
+import android.R.integer;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -101,40 +102,42 @@ public class RecorderFragment extends Fragment {
 		isListening = true;
 
 		audioProcessor = new AudioProcessor() {
+			int frameIndex = 0;
+
 			@Override
 			protected void dataArrival(long timestamp, short[] data,
 					int length, int frameLength) {
 				super.dataArrival(timestamp, data, length, frameLength);
 
-				if(isListening){
+				if (isListening && (frameIndex%10==0)) {//skip 10 frames for features extraction
 					AudioData audioData = new AudioData(timestamp, data);
-					final Feature feature = featuresExtractor.extractFeatures(audioData);
+					final Feature feature = featuresExtractor
+							.extractFeatures(audioData);
 					audioFeatures.add(feature);
-					
-					handler.post(new Runnable() {
-					@Override
-					public void run() {
-						matches[0] = "l1Norm "
-								+ feature.getL1Norm();
-						matches[1] = "l2Norm "
-								+ feature.getL2Norm();
-						matches[2] = "linfNorm "
-								+ feature.getLinfNorm();
-						matches[3] = "mfccs "
-								+ feature.getMfccsAsString();
-						matches[4] = "diffSecs "
-								+ feature.getDiffSecs();
 
-						arrayAdapter.notifyDataSetChanged();
-					}
-				});	
+					handler.post(new Runnable() {
+						@Override
+						public void run() {
+							matches[0] = "l1Norm " + feature.getL1Norm();
+							matches[1] = "l2Norm " + feature.getL2Norm();
+							matches[2] = "linfNorm " + feature.getLinfNorm();
+							matches[3] = "mfccs " + feature.getMfccsAsString();
+							matches[4] = "diffSecs " + feature.getDiffSecs();
+
+							arrayAdapter.notifyDataSetChanged();
+						}
+					});
 				}
+
+				frameIndex++;
+				if(frameIndex == Integer.MAX_VALUE - 1)
+					frameIndex = 0;
 			}
 
 		};
 
 		audioProcessor.startRecord();
-		
+
 	}
 
 	private void stopRecording() {
@@ -149,27 +152,34 @@ public class RecorderFragment extends Fragment {
 			}
 		};
 		uim.getLabel(getActivity(), "Label the sound", callback);
-		
+
 	}
-	
+
 	private void applyLabel(String value) {
 		labelString = value;
 
 		// TODO - need to move it as event handler
 		if (labelString != "") {
 			// writeDataToFile();
-			dumpAudioData( audioProcessor.getSamples(), labelString);
+			dumpAudioData(audioProcessor.getSamples(), labelString);
 			writeDataToDatabase(labelString);
 		}
 		labelString = "";
-		
-		//need to move to better place
+
+		// need to move to better place
 		audioProcessor.clearSamples();
 	}
-	
+
 	private void writeDataToDatabase(String name) {
+		write(name);
+
+		audioFeatures = new LinkedList<Feature>();
+		dataCount = 0;
+	}
+
+	private void write(String name) {
 		DatabaseHandler db = new DatabaseHandler(this.getActivity());
-		
+
 		Iterator<Feature> itr = audioFeatures.iterator();
 		while (itr.hasNext()) {
 			Feature feature = itr.next();
@@ -185,27 +195,30 @@ public class RecorderFragment extends Fragment {
 						+ featuresCount, Toast.LENGTH_LONG).show();
 
 		db.close();
-
-		audioFeatures = new LinkedList<Feature>();
-		dataCount = 0;
 	}
 
-	private void dumpAudioData(ArrayList<KeyValuePair<Long, short[]>> samples, String label) {
+	private void dumpAudioData(ArrayList<KeyValuePair<Long, short[]>> samples,
+			String label) {
 
-		ASRFileWriter fileWriter = new ASRFileWriter(label);
+		if (samples == null || samples.size() < 2)
+			return;
 
-		for (KeyValuePair<Long, short[]> sample : samples) {
+		ASRFileWriter fileWriter = new ASRFileWriter(samples.get(0).getKey() + "_"+label + ".pcm");
+
+		//skip the 1st sample, often 1st data is vague
+		for (int i = 1; i < samples.size(); i++) {
+			KeyValuePair<Long, short[]> sample= samples.get(i);
 			String sampleString = Arrays.toString(sample.getValue());
 			int length = sampleString.length();
 			fileWriter.appendText(sample.getKey() + ","
 					+ sampleString.substring(1, length - 1));
-		}
+		}	
 
 		fileWriter.close();
 	}
-	
+
 	private void initializeDependencies() {
-		
+
 		audioProcessor = new AudioProcessor();
 		audioFeatures = new LinkedList<Feature>();
 		handler = new Handler();

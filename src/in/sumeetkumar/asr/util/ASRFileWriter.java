@@ -26,7 +26,7 @@ public class ASRFileWriter {
             }
 
             long epoch = System.currentTimeMillis()/1000;
-            File gpxfile = new File(root, sFileName+ epoch);
+            File gpxfile = new File(root, sFileName);
 			writer = new FileWriter(gpxfile);
 		} catch (IOException e) {
 			Log.d(LogUtil.TAG, e.toString());
